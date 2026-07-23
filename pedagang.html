@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LAUKIN - Dashboard & Laporan Keuangan Pedagang</title>
+    <!-- Tailwind CSS & FontAwesome CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 font-sans pb-10">
+
+    <!-- Header Navigation Pedagang -->
+    <header class="bg-slate-800 text-white sticky top-0 z-50 shadow-md">
+        <div class="max-w-md mx-auto p-4 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-store text-emerald-400 text-xl"></i>
+                <div>
+                    <h1 class="text-lg font-bold tracking-wide leading-tight">LAUKIN MERCHANT</h1>
+                    <p class="text-[10px] text-slate-300">Dashboard & Laporan Keuangan Kantin</p>
+                </div>
+            </div>
+            <!-- Status Online/Offline -->
+            <span class="bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
+                <span class="w-2 h-2 bg-white rounded-full animate-ping"></span> Stand Buka
+            </span>
+        </div>
+    </header>
+
+    <!-- Main Merchant Content -->
+    <main class="max-w-md mx-auto p-4 space-y-5">
+
+        <!-- ========================================== -->
+        <!-- SECTION 1: RINGKASAN LAPORAN KEUANGAN     -->
+        <!-- ========================================== -->
+        <section class="space-y-3">
+            <div class="flex justify-between items-center">
+                <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Ringkasan Keuangan Hari Ini</h2>
+                <button onclick="window.print()" class="text-[10px] bg-slate-200 text-slate-700 px-2 py-1 rounded hover:bg-slate-300">
+                    <i class="fa-solid fa-print mr-1"></i>Cetak Laporan
+                </button>
+            </div>
+
+            <!-- Card Total Omzet (Highlight Utama) -->
+            <div class="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-4 rounded-2xl shadow-lg space-y-1">
+                <p class="text-[11px] text-emerald-100 font-medium">Total Omzet / Pendapatan Masuk</p>
+                <h3 id="stat-total-revenue" class="text-2xl font-black">Rp 0</h3>
+                <p class="text-[10px] text-emerald-200 pt-1 flex items-center gap-1">
+                    <i class="fa-solid fa-circle-check"></i> Terverifikasi via QRIS Non-Tunai
+                </p>
+            </div>
+
+            <!-- Card Statistik Sekunder -->
+            <div class="grid grid-cols-2 gap-3 text-xs">
+                <div class="bg-white p-3 rounded-xl border shadow-sm space-y-1">
+                    <p class="text-gray-500 font-medium">Total Pesanan</p>
+                    <p id="stat-total-orders" class="text-lg font-extrabold text-slate-800">0</p>
+                </div>
+                <div class="bg-white p-3 rounded-xl border shadow-sm space-y-1">
+                    <p class="text-gray-500 font-medium">Pesanan Selesai</p>
+                    <p id="stat-ready-orders" class="text-lg font-extrabold text-emerald-600">0</p>
+                </div>
+            </div>
+        </section>
+
+        <hr class="border-gray-200">
+
+        <!-- ========================================== -->
+        <!-- SECTION 2: DAFTAR PESANAN MASUK (REAL-TIME) -->
+        <!-- ========================================== -->
+        <section class="space-y-3">
+            <div class="flex justify-between items-center">
+                <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Antrean Pesanan Masuk</h2>
+                <button onclick="clearAllOrders()" class="text-[10px] text-red-500 hover:underline">
+                    Reset Pesanan
+                </button>
+            </div>
+
+            <div id="merchant-orders-list" class="space-y-3">
+                <!-- Diisi via Javascript secara Real-Time -->
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- SECTION 3: RIWAYAT TRANSAKSI KEUANGAN     -->
+        <!-- ========================================== -->
+        <section class="space-y-3">
+            <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Rincian Transaksi Lunas</h2>
+            <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+                <div class="p-3 border-b bg-gray-50 text-[11px] font-bold text-gray-600 flex justify-between">
+                    <span>ID / Pemesan</span>
+                    <span>Nominal (QRIS)</span>
+                </div>
+                <div id="financial-history-list" class="divide-y text-xs">
+                    <!-- Diisi via Javascript -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- LOGIC JAVASCRIPT MERCHANT & KEUANGAN -->
+    <script>
+        function renderMerchantDashboard() {
+            const orders = JSON.parse(localStorage.getItem('laukin_orders') || '[]');
+            
+            const ordersContainer = document.getElementById('merchant-orders-list');
+            const historyContainer = document.getElementById('financial-history-list');
+
+            // --- 1. HITUNG STATISTIK KEUANGAN ---
+            const totalOrdersCount = orders.length;
+            const readyOrdersCount = orders.filter(o => o.status === 'Ready').length;
+            
+            // Hitung Omzet Keseluruhan Transaksi
+            const totalRevenue = orders.reduce((sum, order) => sum + (order.total || 0), 0);
+
+            // Update Tampilan Stats Keuangan
+            document.getElementById('stat-total-revenue').innerText = `Rp ${totalRevenue.toLocaleString('id-ID')}`;
+            document.getElementById('stat-total-orders').innerText = totalOrdersCount;
+            document.getElementById('stat-ready-orders').innerText = readyOrdersCount;
+
+            // --- 2. RENDER ANTREAN PESANAN ---
+            ordersContainer.innerHTML = '';
+
+            if (orders.length === 0) {
+                ordersContainer.innerHTML = `
+                    <div class="bg-white p-6 rounded-xl border text-center text-gray-400 space-y-2">
+                        <i class="fa-solid fa-utensils text-3xl text-gray-300"></i>
+                        <p class="text-xs">Belum ada pesanan masuk dari mahasiswa.</p>
+                    </div>
+                `;
+            } else {
+                orders.forEach((order, index) => {
+                    let statusBadge = `<span class="bg-yellow-100 text-yellow-800 text-[10px] px-2 py-0.5 rounded-full font-bold">Sedang Diproses</span>`;
+                    if(order.status === 'Ready') {
+                        statusBadge = `<span class="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">SIAP DIAMBIL!</span>`;
+                    }
+
+                    ordersContainer.innerHTML += `
+                        <div class="bg-white p-4 rounded-xl shadow-sm border space-y-3">
+                            <div class="flex justify-between items-center border-b pb-2">
+                                <div>
+                                    <span class="font-extrabold text-sm text-slate-800 mr-2">${order.orderId}</span>
+                                    <span class="text-xs text-gray-600 font-medium">${order.customer}</span>
+                                </div>
+                                ${statusBadge}
+                            </div>
+
+                            <div class="space-y-1">
+                                <p class="text-xs text-gray-700 font-semibold">Menu: ${order.items.join(', ')}</p>
+                                <p class="text-xs text-emerald-600 font-bold">Total Pembayaran: Rp ${order.total.toLocaleString('id-ID')}</p>
+                            </div>
+
+                            <div class="pt-1">
+                                ${order.status === 'Diproses' ? `
+                                    <button onclick="markAsReady(${index})" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-xl text-xs shadow flex justify-center items-center gap-2">
+                                        <i class="fa-solid fa-bell"></i> Tandai "SIAP DIAMBIL" & Kirim Notif
+                                    </button>
+                                ` : `
+                                    <button class="w-full bg-gray-100 text-gray-500 font-bold py-2 rounded-xl text-xs cursor-default border">
+                                        <i class="fa-solid fa-check text-emerald-500"></i> Notifikasi Sudah Terkirim
+                                    </button>
+                                `}
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            // --- 3. RENDER RIWAYAT LAPORAN KEUANGAN ---
+            historyContainer.innerHTML = '';
+            if (orders.length === 0) {
+                historyContainer.innerHTML = `<p class="text-[11px] text-gray-400 p-3 text-center">Belum ada riwayat transaksi.</p>`;
+            } else {
+                orders.forEach(order => {
+                    historyContainer.innerHTML += `
+                        <div class="p-3 flex justify-between items-center hover:bg-gray-50">
+                            <div>
+                                <p class="font-bold text-gray-800">${order.orderId} - ${order.customer}</p>
+                                <p class="text-[10px] text-gray-400">${order.items.length} Menu • Status: ${order.status}</p>
+                            </div>
+                            <span class="font-bold text-emerald-600">+ Rp ${order.total.toLocaleString('id-ID')}</span>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        // Tandai pesanan siap & picu notifikasi ke pelanggan via LocalStorage Sync
+        function markAsReady(index) {
+            const orders = JSON.parse(localStorage.getItem('laukin_orders') || '[]');
+            orders[index].status = 'Ready';
+            localStorage.setItem('laukin_orders', JSON.stringify(orders));
+            
+            renderMerchantDashboard();
+        }
+
+        function clearAllOrders() {
+            if (confirm('Yakin ingin mengosongkan riwayat pesanan dan data keuangan?')) {
+                localStorage.removeItem('laukin_orders');
+                localStorage.removeItem('laukin_my_order');
+                renderMerchantDashboard();
+            }
+        }
+
+        // Polling Real-Time setiap 2 detik untuk menyinkronkan pesanan & keuangan
+        setInterval(renderMerchantDashboard, 2000);
+
+        // Init
+        renderMerchantDashboard();
+    </script>
+</body>
+</html>
